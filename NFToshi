@@ -1,0 +1,45 @@
+// npm i @neynar/nodejs-sdk
+import { NeynarAPIClient, FeedType, FilterType } from "@neynar/nodejs-sdk";
+
+// make sure to set your NEYNAR_API_KEY .env
+// don't have an API key yet? get one at neynar.com
+const client = new NeynarAPIClient(process.env.NEYNAR_API_KEY);
+
+const getAddr = async (nftAddr: string): Promise<string[]> => {
+  const apiKey = process.env.ALCHEMY_API_KEY;
+  const baseUrl = `https://eth-mainnet.g.alchemy.com/nft/v3/${apiKey}/getOwnersForContract?`;
+  const url = `${baseUrl}contractAddress=${nftAddr}&withTokenBalances=false`;
+
+  const result = await fetch(url, {
+    headers: { accept: "application/json" },
+  });
+  const data = await result.json();
+  return data.owners;
+};
+
+// NFToshi contract address
+const nftAddr = "0xBDB1A8772409A0C5eEb347060cbf4B41dD7B2C62";
+const addrs = await getAddr(nftAddr);
+
+const fidLookup = async (addrs: string[]) => {
+  const fids = await Promise.all(
+    addrs.map(async (addr) => {
+      try {
+        const response = await client.lookupUserByVerification(addr);
+        return response ? response.result.user.fid : undefined;
+      } catch (error) {
+        return undefined;
+      }
+    })
+  );
+  return fids.filter((fid) => fid !== undefined);
+};
+
+const fids = await fidLookup(addrs);
+
+const feed = await client.fetchFeed(FeedType.Filter, {
+  filterType: FilterType.Fids,
+  fids
+});
+
+console.log(feed);
